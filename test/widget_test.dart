@@ -133,7 +133,16 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const MaterialApp(home: InventoryRecordsScreen()));
     await tester.pumpAndSettle();
-    expect(find.text('库存记录'), findsOneWidget);
+    expect(find.text('货品库存统计'), findsOneWidget);
+  });
+
+  testWidgets('inventory add form opens', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const MaterialApp(home: InventoryRecordsScreen()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.add));
+    await tester.pumpAndSettle();
+    expect(find.text('新增库存记录'), findsOneWidget);
   });
 
   test('column parser recovers row when header cells are merged', () {

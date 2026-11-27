@@ -10,6 +10,7 @@ import '../models.dart';
 import '../ocr_service.dart';
 import '../repository.dart';
 import '../widgets.dart';
+import 'image_annotator.dart';
 
 class CatalogScreen extends StatefulWidget {
   const CatalogScreen({super.key});
@@ -386,14 +387,67 @@ class _CatalogScreenState extends State<CatalogScreen> {
                                 ),
                               ),
                             ),
+                            Positioned(
+                              left: -6,
+                              bottom: -6,
+                              child: GestureDetector(
+                                onTap: () async {
+                                  final result = await Navigator.push<String>(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          ImageAnnotatorScreen(path: images[i]),
+                                    ),
+                                  );
+                                  if (result != null) {
+                                    setDialogState(() => images[i] = result);
+                                  }
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(
+                                      color: AppColors.primary,
+                                      shape: BoxShape.circle),
+                                  child: const Icon(Icons.brush,
+                                      size: 13, color: Colors.white),
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       if (images.length < 3)
                         OutlinedButton(
                           onPressed: () async {
                             try {
-                              final files = await _picker.pickMultiImage(imageQuality: 90);
-                              if (files.isEmpty) return;
+                              final source = await showModalBottomSheet<ImageSource>(
+                                context: context,
+                                builder: (context) => SafeArea(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      ListTile(
+                                        leading: const Icon(Icons.photo_camera_outlined),
+                                        title: const Text('拍摄货品照片'),
+                                        onTap: () => Navigator.pop(context, ImageSource.camera),
+                                      ),
+                                      ListTile(
+                                        leading: const Icon(Icons.photo_library_outlined),
+                                        title: const Text('从相册选择'),
+                                        onTap: () => Navigator.pop(context, ImageSource.gallery),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                              if (source == null) return;
+                              final files = <XFile>[];
+                              if (source == ImageSource.camera) {
+                                final file =
+                                    await _picker.pickImage(source: source, imageQuality: 90);
+                                if (file != null) files.add(file);
+                              } else {
+                                files.addAll(await _picker.pickMultiImage(imageQuality: 90));
+                              }
                               for (final file in files) {
                                 if (images.length >= 3) break;
                                 final saved = await _saveCatalogImage(file.path);

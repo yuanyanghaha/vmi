@@ -11,6 +11,7 @@ import '../repository.dart';
 import '../supplier_matcher.dart';
 import '../widgets.dart';
 import '../xlsx_export.dart';
+import 'inventory_form_dialog.dart';
 
 class InventoryRecordsScreen extends StatefulWidget {
   const InventoryRecordsScreen({super.key});
@@ -134,7 +135,11 @@ class _InventoryRecordsScreenState extends State<InventoryRecordsScreen> {
       if (_page >= _pageCount) _page = _pageCount - 1;
       if (_page < 0) _page = 0;
     });
-    if (mounted) showMessage(context, '库存记录已更新');
+    final added = await _syncMissingToCatalog(only: updated);
+    if (mounted) {
+      showMessage(context,
+          added > 0 ? '已更新，并同步到货品配置' : '库存记录已更新');
+    }
   }
 
   Future<void> _delete(InventoryRecord record) async {
@@ -165,6 +170,60 @@ class _InventoryRecordsScreenState extends State<InventoryRecordsScreen> {
       if (_page < 0) _page = 0;
     });
   }
+
+  Future<int> _syncMissingToCatalog({InventoryRecord? only}) async {
+    final catalog = await AppRepository.loadCatalog();
+    final existing = <String>{
+      for (final item in catalog) '${item.supplier}|${item.materialCode}',
+    };
+    final source = only == null ? _records : <InventoryRecord>[only];
+    var added = 0;
+    for (final record in source) {
+      final supplier = SupplierMatcher.match(record.manufacturer, _suppliers);
+      if (supplier == null) continue;
+      final key = '${supplier.code}|${record.materialCode}';
+      if (existing.contains(key)) continue;
+      catalog.add(CatalogItem(
+        materialCode: record.materialCode,
+        description: record.description,
+        lpn: record.batch,
+        supplier: supplier.code,
+        perBox: record.perBox,
+        images: record.imagePath.isEmpty ? <String>[] : <String>[record.imagePath],
+      ));
+      existing.add(key);
+      added++;
+    }
+    if (added > 0) await AppRepository.saveCatalog(catalog);
+    return added;
+  }
+
+  Future<void> _syncAll() async {
+    final added = await _syncMissingToCatalog();
+    if (!mounted) return;
+    showMessage(context,
+        added > 0 ? '已同步 $added 个货品到货品配置' : '货品配置已是最新，无需同步');
+  }
+
+  Future<void> _addInventory() async {
+    final created = await showDialog<InventoryRecord>(
+      context: context,
+      builder: (_) => InventoryFormDialog(suppliers: _suppliers),
+    );
+    if (created == null) return;
+    final list = await AppRepository.loadInventory();
+    list.insert(0, created);
+    await AppRepository.saveInventory(list);
+    final added = await _syncMissingToCatalog(only: created);
+    if (!mounted) return;
+    setState(() {
+      _records = list;
+      _page = 0;
+    });
+    showMessage(context,
+        added > 0 ? '库存已保存，并同步到货品配置' : '库存记录已保存');
+  }
+
 
   Future<void> _export() async {
     final exportRecords = _filtered;
@@ -218,15 +277,19 @@ class _InventoryRecordsScreenState extends State<InventoryRecordsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('库存记录',
+                        Text('货品库存统计',
                             style: TextStyle(
                                 fontSize: 22, fontWeight: FontWeight.w800)),
-                        Text('筛选、编辑并导出库存数据',
+                        Text('库存列表 · 同步货品配置',
                             style: TextStyle(
                                 fontSize: 11, color: Color(0xFF98A2B3))),
                       ],
                     ),
                   ),
+                  _roundIcon(Icons.sync, _syncAll),
+                  const SizedBox(width: 4),
+                  _roundIcon(Icons.add, _addInventory),
+                  const SizedBox(width: 4),
                   _roundIcon(Icons.file_download_outlined, _export),
                 ],
               ),
