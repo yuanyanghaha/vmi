@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -32,17 +33,9 @@ class _InventoryFormDialogState extends State<InventoryFormDialog> {
   String? _imagePath;
   String? _error;
   bool _busy = false;
-  int? _actualPreview;
-
-  @override
-  void initState() {
-    super.initState();
-    _actual.addListener(_updatePreview);
-  }
 
   @override
   void dispose() {
-    _actual.removeListener(_updatePreview);
     _system.dispose();
     _actual.dispose();
     _code.dispose();
@@ -57,21 +50,6 @@ class _InventoryFormDialogState extends State<InventoryFormDialog> {
       if (item.code == _supplierCode) return item;
     }
     return null;
-  }
-
-  void _updatePreview() {
-    try {
-      final value = ExpressionEvaluator.evaluate(_actual.text);
-      setState(() => _actualPreview = value.toInt());
-    } catch (_) {
-      setState(() => _actualPreview = null);
-    }
-  }
-
-  void _insertPlus() {
-    _actual.text = '${_actual.text}+';
-    _actual.selection =
-        TextSelection.collapsed(offset: _actual.text.length);
   }
 
   Future<void> _pickImage() async {
@@ -141,16 +119,12 @@ class _InventoryFormDialogState extends State<InventoryFormDialog> {
   }
 
   int? _parseStock(String text, String label) {
-    try {
-      final value = ExpressionEvaluator.evaluate(text);
-      if (value < 0 || value != value.roundToDouble()) {
-        throw const FormatException('必须是整数');
-      }
-      return value.toInt();
-    } catch (e) {
-      setState(() => _error = '$label 格式错误：$e');
+    final value = int.tryParse(text.trim());
+    if (value == null || value < 0) {
+      setState(() => _error = '$label 需要是非负整数');
       return null;
     }
+    return value;
   }
 
   Future<String> _saveImage(String source) async {
@@ -445,15 +419,11 @@ class _InventoryFormDialogState extends State<InventoryFormDialog> {
                           child: TextField(
                             controller: _actual,
                             keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly
+                            ],
+                            decoration: const InputDecoration(
                               labelText: '实际库存',
-                              helperText: _actualPreview == null
-                                  ? null
-                                  : '合计 $_actualPreview',
-                              suffixIcon: IconButton(
-                                onPressed: _insertPlus,
-                                icon: const Icon(Icons.add, size: 18),
-                              ),
                             ),
                           ),
                         ),
