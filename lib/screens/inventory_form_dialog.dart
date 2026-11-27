@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import '../calculator.dart';
 import '../models.dart';
 import '../ocr_service.dart';
+import '../repository.dart';
 import '../supplier_matcher.dart';
 import '../widgets.dart';
 
@@ -32,6 +33,7 @@ class _InventoryFormDialogState extends State<InventoryFormDialog> {
   String _recognizedManufacturer = '';
   String? _imagePath;
   String? _error;
+  String _hint = '';
   bool _busy = false;
 
   @override
@@ -104,6 +106,31 @@ class _InventoryFormDialogState extends State<InventoryFormDialog> {
         ...data.manufacturerCandidates,
       ], widget.suppliers);
       _supplierCode = matched?.code;
+      final records = await AppRepository.loadInventory();
+      InventoryRecord? existing;
+      for (final record in records) {
+        if (record.materialCode != data.materialCode) continue;
+        if (matched != null &&
+            SupplierMatcher.match(record.manufacturer, widget.suppliers)?.code !=
+                matched.code) {
+          continue;
+        }
+        existing = record;
+        break;
+      }
+      if (existing != null) {
+        _system.text = '${existing.systemStock}';
+        _actual.text = '${existing.actualStock}';
+        _perBox.text = '${existing.perBox}';
+        _desc.text = existing.description;
+        _batch.text = existing.batch;
+        final existingSupplier =
+            SupplierMatcher.match(existing.manufacturer, widget.suppliers);
+        if (existingSupplier != null) _supplierCode = existingSupplier.code;
+        _hint = '已存在该货品库存，已带出原有数据';
+      } else {
+        _hint = '';
+      }
       if (data.materialCode.isEmpty &&
           data.description.isEmpty &&
           data.perBox <= 0 &&
@@ -481,6 +508,13 @@ class _InventoryFormDialogState extends State<InventoryFormDialog> {
                         child: Text('识别制造商：$_recognizedManufacturer',
                             style: const TextStyle(
                                 fontSize: 10, color: Color(0xFF98A2B3))),
+                      ),
+                    if (_hint.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(_hint,
+                            style: const TextStyle(
+                                fontSize: 11, color: AppColors.green)),
                       ),
                     if (_error != null)
                       Padding(

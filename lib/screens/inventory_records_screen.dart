@@ -524,6 +524,19 @@ class _InventoryRecordsScreenState extends State<InventoryRecordsScreen> {
                   AppColors.green),
               _pill('包装 ${record.perBox}', const Color(0xFFFFFAEB),
                   const Color(0xFFB54708)),
+              _pill(
+                  '差异 ${record.actualStock - record.systemStock > 0 ? '+' : ''}'
+                  '${record.actualStock - record.systemStock}',
+                  record.actualStock == record.systemStock
+                      ? const Color(0xFFF2F4F8)
+                      : record.actualStock > record.systemStock
+                          ? const Color(0xFFECFDF3)
+                          : const Color(0xFFFFF1F2),
+                  record.actualStock == record.systemStock
+                      ? AppColors.sub
+                      : record.actualStock > record.systemStock
+                          ? AppColors.green
+                          : AppColors.red),
             ],
           ),
           const SizedBox(height: 8),
